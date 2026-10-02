@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="ms" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taburan Suhu Persekitaran </title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gov: {
+                            blue: '#002B66',
+                            blueDark: '#001A40',
+                            blueLight: '#1D4ED8',
+                            yellow: '#FFCC00',
+                            yellowDark: '#E6B800',
+                            bg: '#F8FAFC',
+                            card: '#FFFFFF',
+                            text: '#000000',
+                            textMuted: '#000000',
+                            border: '#E2E8F0',
+                            accent: '#0284C7'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+                        serif: ['Merriweather', 'serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Leaflet GIS CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Custom Style Overlays -->
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+            background-color: #F8FAFC;
+            color: #000000;
+            font-size: 16px;
+        }
+
+        #gis-map {
+            height: 100%;
+            width: 100%;
+            z-index: 10;
+        }
+
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            padding: 4px;
+        }
+
+        .high-contrast {
+            background-color: #0F172A !important;
+            color: #FFFFFF !important;
+        }
+        .high-contrast .bg-white, 
+        .high-contrast .bg-gov-card, 
+        .high-contrast .bg-gov-bg {
+            background-color: #1E293B !important;
+            color: #FFFFFF !important;
+            border-color: #334155 !important;
+        }
+        .high-contrast text, .high-contrast span, .high-contrast p, .high-contrast h1, .high-contrast h2, .high-contrast h3, .high-contrast h4 {
+            color: #FFFFFF !important;
+        }
+        
+        /* Custom Scrollbar for Compact Detail Panel */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* Support Native Browser Fullscreen Style */
+        #peta-gis:fullscreen {
+            width: 100vw !important;
+            height: 100vh !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border-radius: 0 !important;
+        }
+
+        /* Active Map Tab Style */
+        .map-tab-btn.active {
+            background-color: #FFCC00 !important;
+            color: #001A40 !important;
+            font-weight: 800 !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-gov-bg text-gov-text antialiased selection:bg-gov-yellow selection:text-gov-blueDark">
+
+    <!-- TOP BAR ACCESSIBILITY -->
+    <div class="bg-gov-blueDark text-white text-xs py-2 px-4 border-b border-gov-yellow/30 sticky top-0 z-50 shadow-md">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
+            
+            <div class="flex items-center gap-3">
+                <span class="inline-flex items-center gap-1.5 font-bold text-gov-yellow tracking-wide">
+                    <i class="fa-solid fa-graduation-cap text-sm"></i> PROJEK TAHUN AKHIR (FYP)
+                </span>
+                <span class="hidden md:inline text-slate-500">|</span>
+                <span class="hidden md:inline text-slate-300 font-medium">
+                    <i class="fa-regular fa-calendar-check mr-1 text-gov-yellow"></i> <span id="current-date-hijri">Khamis, 24 September 2026</span>
+                </span>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MAIN BRANDING HEADER -->
+    <header class="bg-white border-b border-gov-border shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-5 flex flex-col lg:flex-row items-center justify-between gap-5">
+            
+            <div class="flex items-center gap-4 text-center sm:text-left">
+                <div class="w-16 h-16 shrink-0 bg-gradient-to-br from-gov-blue to-gov-blueDark rounded-2xl border-2 border-gov-yellow p-1.5 flex flex-col items-center justify-center text-white shadow-md">
+                    <i class="fa-solid fa-earth-asia text-2xl text-gov-yellow animate-pulse"></i>
+                    <span class="text-[9px] font-black tracking-widest mt-1 uppercase text-center leading-none">GIS FYP</span>
+                </div>
+
+                <div>
+                    <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+                        <span id="badge-spatial" class="bg-gov-blue text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full tracking-wider uppercase shadow-xs">Analisis Spasial GIS</span>
+                        <span class="text-xs text-gov-accent font-bold"><i class="fa-solid fa-location-dot mr-1"></i>Negeri Selangor Darul Ehsan</span>
+                    </div>
+                    <h1 id="header-portal-title" class="text-xl sm:text-2xl font-black text-gov-blueDark leading-snug tracking-tight">
+        
+                    </h1>
+                    <p id="header-portal-subtitle" class="text-xs sm:text-sm text-black font-bold mt-0.5">
+                        Analisis Spasial & Pemetaan Suhu Alam Sekitar Menggunakan Sistem Maklumat Geografi (GIS)
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex flex-col items-end gap-2 w-full lg:w-72">
+                <div class="relative w-full">
+                    <input type="text" id="site-search" placeholder="Cari daerah / kawasan (cth: Shah Alam)..." onkeyup="if(event.key === 'Enter') handleSearch()" class="w-full pl-9 pr-10 py-2.5 text-xs bg-gov-bg border border-gov-border rounded-xl focus:ring-2 focus:ring-gov-blue focus:bg-white focus:outline-none transition shadow-inner text-black font-bold placeholder:text-black">
+                    <i class="fa-solid fa-magnifying-glass text-black absolute left-3 top-3 text-xs"></i>
+                    <button onclick="handleSearch()" id="btn-search" class="absolute right-1 top-1 bottom-1 bg-gov-blue hover:bg-gov-blueLight text-white px-3 rounded-lg transition text-xs font-bold">
+                        Cari
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- MAIN NAVIGATION BAR -->
+        <nav class="bg-gov-blue text-white border-t-2 border-gov-yellow sticky top-[37px] z-40">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex flex-wrap items-center justify-between">
+                    
+                    <div class="hidden lg:flex items-center space-x-1 text-xs font-bold tracking-wide">
+                        <a href="#utama" id="nav-utama" class="px-4 py-3.5 bg-gov-blueDark text-gov-yellow border-b-2 border-gov-yellow flex items-center gap-2 transition">
+                            <i class="fa-solid fa-house"></i> <span>Utama</span>
+                        </a>
+                        <a href="#peta-gis" id="nav-peta" class="px-4 py-3.5 hover:bg-gov-blueLight hover:text-gov-yellow transition flex items-center gap-2">
+                            <i class="fa-solid fa-map-location-dot"></i> <span>Peta Spasial Suhu</span>
+                        </a>
+                        <a href="#project-overview" id="nav-gambaran" class="px-4 py-3.5 hover:bg-gov-blueLight hover:text-gov-yellow transition flex items-center gap-2">
+                            <i class="fa-solid fa-circle-info"></i> <span>Gambaran Projek</span>
+                        </a>
+                        <a href="#analisis-daerah" id="nav-analisis" class="px-4 py-3.5 hover:bg-gov-blueLight hover:text-gov-yellow transition flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line"></i> <span>Analisis Daerah</span>
+                        </a>
+                        <a href="#panduan-mitigasi" id="nav-mitigasi" class="px-4 py-3.5 hover:bg-gov-blueLight hover:text-gov-yellow transition flex items-center gap-2">
+                            <i class="fa-solid fa-temperature-arrow-down"></i> <span>Panduan Mitigasi</span>
+                        </a>
+                        <a href="#pasukan-penyelidik" id="nav-ahli" class="px-4 py-3.5 hover:bg-gov-blueLight hover:text-gov-yellow transition flex items-center gap-2">
+                            <i class="fa-solid fa-users"></i> <span>Ahli Kumpulan</span>
+                        </a>
+                    </div>
+
+                    <div class="lg:hidden w-full flex justify-between items-center py-2.5">
+                        <span id="mobile-menu-title" class="text-xs font-black text-gov-yellow uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-bars-staggered"></i> MENU PROJEK FYP
+                        </span>
+                        <button onclick="toggleMobileNav()" class="p-2 text-white hover:text-gov-yellow focus:outline-none">
+                            <i class="fa-solid fa-bars text-xl"></i>
+                        </button>
+                    </div>
+
+                </div>
+
+                <div id="mobile-menu" class="hidden lg:hidden py-3 border-t border-white/10 space-y-1.5 text-xs font-bold">
+                    <a href="#utama" onclick="toggleMobileNav()" class="block px-3 py-2 rounded bg-gov-blueDark text-gov-yellow">Utama</a>
+                    <a href="#peta-gis" onclick="toggleMobileNav()" class="block px-3 py-2 rounded hover:bg-gov-blueLight">Peta Spasial Suhu</a>
+                    <a href="#project-overview" onclick="toggleMobileNav()" class="block px-3 py-2 rounded hover:bg-gov-blueLight">Gambaran Projek</a>
+                    <a href="#gis-methodology" onclick="toggleMobileNav()" class="block px-3 py-2 rounded hover:bg-gov-blueLight">Metodologi GIS</a>
+                    <a href="#analisis-daerah" onclick="toggleMobileNav()" class="block px-3 py-2 rounded hover:bg-gov-blueLight">Analisis Daerah</a>
+                    <a href="#panduan-mitigasi" onclick="toggleMobileNav()" class="block px-3 py-2 rounded hover:bg-gov-blueLight">Panduan Mitigasi</a>
+                    <a href="#data-terbuka" onclick="toggleMobileNav()" class="block px-3 py-2 rounded hover:bg-gov-blueLight">Muat Turun Data GIS</a>
+                    <a href="#pasukan-penyelidik" onclick="toggleMobileNav()" class="block px-3 py-2 rounded hover:bg-gov-blueLight">Ahli Kumpulan (FYP)</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- TICKER -->
+    <div class="bg-gradient-to-r from-amber-500/10 via-gov-yellow/20 to-amber-500/10 border-b border-gov-yellow/40 text-gov-blueDark text-xs py-2 px-4 font-semibold">
+        <div class="max-w-7xl mx-auto flex items-center gap-3">
+            <span id="ticker-badge" class="bg-gov-yellow text-gov-blueDark font-black px-2.5 py-0.5 rounded text-[10px] tracking-wider shrink-0 uppercase shadow-xs flex items-center gap-1">
+                <i class="fa-solid fa-bullhorn text-xs"></i> HEBAHAN FYP
+            </span>
+            <marquee id="ticker-text" class="w-full text-black font-extrabold">
+                Pemetaan Taburan Suhu Alam Sekitar Bagi Daerah, Shah Alam & Parlimen Negeri Selangor Telah Dikemaskini Menggunakan Kaedah Analisis Spasial GIS Terkini. Data Terbuka Sedia Diakses Untuk Kajian Akademik.
+            </marquee>
+        </div>
+    </div>
+
+    <!-- HERO SECTION -->
+    <section id="utama" class="relative bg-gradient-to-br from-gov-blueDark via-gov-blue to-slate-900 text-white py-12 md:py-16 border-b-4 border-gov-yellow overflow-hidden">
+        <div class="absolute -right-20 -bottom-20 opacity-10 text-white pointer-events-none">
+            <i class="fa-solid fa-map-location-dot text-[350px]"></i>
+        </div>
+
+        <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center relative z-10">
+            
+            <div class="lg:col-span-8 space-y-5">
+                <div id="hero-badge" class="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-3.5 py-1.5 rounded-full text-xs font-bold text-gov-yellow shadow-inner">
+                    <i class="fa-solid fa-circle-check text-emerald-400"></i> Laporan Akhir Projek Penyelidikan Tahun Akhir (FYP)
+                </div>
+
+                <h2 class="text-3xl sm:text-4xl md:text-5xl font-black leading-tight tracking-tight text-white">
+                    Peta Taburan Suhu DiNegeri Selangor 
+                </h2>
+
+                <p id="hero-desc" class="text-white text-sm md:text-base leading-relaxed max-w-3xl font-medium">
+                    Sistem pemetaan maklumat geospatial ini dibangunkan khas untuk menganalisis, memetakan, dan memantau taburan suhu alam sekitar serta variasi mikroiklim di kesemua daerah, kawasan Shah Alam, dan zon Parlimen Negeri Selangor secara berasaskan Sistem Maklumat Geografi (GIS).
+                </p>
+
+                <div class="pt-3 flex flex-wrap gap-3">
+                    <a href="#peta-gis" id="btn-interactive-map" class="px-6 py-3 bg-gov-yellow text-gov-blueDark font-extrabold text-xs sm:text-sm rounded-xl hover:bg-gov-yellowDark hover:shadow-lg transition flex items-center gap-2 shadow-md">
+                        <i class="fa-solid fa-map-marked-alt text-base"></i> Akses Peta Spasial Interaktif
+                    </a>
+            
+                    </a>
+                </div>
+            </div>
+
+            <div class="lg:col-span-4">
+                <div class="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl shadow-2xl text-xs space-y-3.5">
+                    <div class="flex items-center justify-between border-b border-white/20 pb-3">
+                        <span id="proj-status-title" class="font-extrabold uppercase text-gov-yellow tracking-wider">Status Projek GIS</span>
+                        <span id="proj-status-val" class="bg-emerald-500/20 text-emerald-300 font-bold px-2.5 py-1 rounded-full border border-emerald-400/40 text-[10px]">
+                            <i class="fa-solid fa-check-circle mr-1"></i> LENGKAP
+                        </span>
+                    </div>
+                    <div class="space-y-2.5 text-white font-medium">
+                        <div class="flex justify-between items-center">
+                            <span id="lbl-method">Kaedah Analisis:</span>
+                            <b class="text-white bg-white/10 px-2 py-0.5 rounded">Spatial Interpolation / Overlay</b>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span id="lbl-format">Format Peta:</span>
+                            <b class="text-white bg-white/10 px-2 py-0.5 rounded">Shapefile / GeoJSON / Raster</b>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span id="lbl-coverage">Liputan Kajian:</span>
+                            <b class="text-white bg-white/10 px-2 py-0.5 rounded">Selangor (Daerah / Parlimen)</b>
+                        </div>
+                        <div class="flex justify-between items-center border-t border-white/10 pt-2">
+                            <span id="lbl-team">Ahli Kumpulan:</span>
+                            <b class="text-gov-yellow font-bold">4 Ahli Penyelidik FYP</b>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- KEY STATISTICS DASHBOARD -->
+    <section class="max-w-7xl mx-auto px-4 -mt-7 relative z-20">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <div class="bg-white p-5 rounded-2xl border border-gov-border shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-between group">
+                <div>
+                    <span id="stat-lbl-1" class="text-[11px] font-extrabold text-black uppercase tracking-wider block">Suhu Purata Selangor</span>
+                    <h3 class="text-3xl font-black text-amber-600 mt-1">28.7 °C</h3>
+                    <p id="stat-sub-1" class="text-[11px] text-black mt-1 font-bold"><i class="fa-solid fa-temperature-high text-rose-500 mr-1"></i> Purata Keseluruhan Neg.</p>
+                </div>
+                <div class="w-13 h-13 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl font-bold group-hover:scale-110 transition-transform">
+                    <i class="fa-solid fa-temperature-high"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-gov-border shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-between group">
+                <div>
+                    <span id="stat-lbl-2" class="text-[11px] font-extrabold text-black uppercase tracking-wider block">Suhu Maksimum (Urban)</span>
+                    <h3 class="text-3xl font-black text-rose-600 mt-1">33.8 °C</h3>
+                    <p id="stat-sub-2" class="text-[11px] text-black mt-1 font-bold"><i class="fa-solid fa-city text-rose-600 mr-1"></i> Zon Haba Tinggi (Petaling)</p>
+                </div>
+                <div class="w-13 h-13 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-2xl font-bold group-hover:scale-110 transition-transform">
+                    <i class="fa-solid fa-fire-flame-curved"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-gov-border shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-between group">
+                <div>
+                    <span id="stat-lbl-3" class="text-[11px] font-extrabold text-black uppercase tracking-wider block">Suhu Minimum (Hutan)</span>
+                    <h3 class="text-3xl font-black text-emerald-600 mt-1">24.2 °C</h3>
+                    <p id="stat-sub-3" class="text-[11px] text-black mt-1 font-bold"><i class="fa-solid fa-tree text-emerald-600 mr-1"></i> Zon Sejuk (Hulu Selangor)</p>
+                </div>
+                <div class="w-13 h-13 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl font-bold group-hover:scale-110 transition-transform">
+                    <i class="fa-solid fa-tree"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-gov-border shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-between group">
+                <div>
+                    <span id="stat-lbl-4" class="text-[11px] font-extrabold text-black uppercase tracking-wider block">Kawasan Dipantau</span>
+                    <h3 class="text-3xl font-black text-gov-blue mt-1">11 Zon</h3>
+                    <p id="stat-sub-4" class="text-[11px] text-black mt-1 font-bold"><i class="fa-solid fa-layer-group text-gov-blue mr-1"></i> Daerah & Shah Alam / Parlimen</p>
+                </div>
+                <div class="w-13 h-13 rounded-2xl bg-blue-50 text-gov-blue flex items-center justify-center text-2xl font-bold group-hover:scale-110 transition-transform">
+                    <i class="fa-solid fa-map"></i>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- FULLSCREEN & EXTRA WIDE INTERACTIVE LEAFLET WEBGIS SECTION -->
+    <section id="peta-gis" class="w-full min-h-screen h-[105vh] bg-slate-950 flex flex-col overflow-hidden my-0">
+        
+        <!-- Header Atas Peta Ringkas & Kemas -->
+        <div class="bg-slate-900 text-white px-4 sm:px-6 py-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 shrink-0 z-10 shadow-md gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-gov-yellow text-gov-blueDark flex items-center justify-center text-base font-bold shadow-sm">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                </div>
+                <div>
+                    <h3 id="map-section-title" class="text-base font-black tracking-tight leading-none text-white">
+                        Peta Spasial Suhu Alam Sekitar Selangor
+                    </h3>
+                    <p id="map-section-subtitle" class="text-[11px] text-white font-bold mt-1">Pemetaan GIS Interaktif / Model Spatial QGIS2Web</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bekas Utama: Flex Layout (Peta Penuh + Panel Kanan Ditingkatkan Saiznya) -->
+        <div class="flex-1 flex flex-col lg:flex-row w-full h-full overflow-hidden relative">
+            
+            <!-- Peta Utama -->
+            <div class="flex-1 w-full h-full relative bg-slate-900 order-1">
+                <iframe id="map-iframe-display" src="qgis2web_2026_09_26-02_34_30_100298\qgis2web_2026_09_26-02_34_30_100298\index.html" class="w-full h-full border-0 shadow-inner"></iframe>
+            </div>
+
+            <!-- Panel Detail Tepi Kanan -->
+            <div class="w-full lg:w-80 xl:w-96 h-full bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 p-4 overflow-y-auto custom-scrollbar flex flex-col justify-between shrink-0 order-2 z-20 text-slate-200 space-y-4">
+                
+                <div class="space-y-4">
+                    <!-- RUANGAN CARIAN DAERAH (MENGGANTIKAN LAYER AKTIF) -->
+                    <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/80 shadow-md backdrop-blur-sm space-y-2">
+                        <label id="lbl-district-search" for="district-map-search" class="text-xs font-bold text-gov-yellow uppercase tracking-wider block">
+                            <i class="fa-solid fa-magnifying-glass-location mr-1"></i>daerah yang ingin di lihat:
+                        </label>
+                        <div class="relative">
+                            <input type="text" id="district-map-search" placeholder="Contoh: Klang, Petaling, Sepang..." onkeyup="if(event.key === 'Enter') searchAndZoomDistrict()" class="w-full pl-3 pr-10 py-2 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white placeholder:text-white focus:outline-none focus:border-gov-yellow transition">
+                            <button onclick="searchAndZoomDistrict()" class="absolute right-1 top-1 bottom-1 px-2.5 bg-gov-yellow hover:bg-gov-yellowDark text-gov-blueDark font-extrabold rounded text-xs transition">
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                        </div>
+                        <p id="search-status-msg" class="text-[10px] text-white font-bold"></p>
+                    </div>
+
+                    <!-- KATEGORI SEBELAH KANAN: 1 PETA BOUNDARY -->
+                    <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/80 shadow-md space-y-2">
+                        <span id="cat-boundary-title" class="text-[10px] font-black text-emerald-400 uppercase tracking-wider block border-b border-slate-700 pb-1">
+                            <i class="fa-solid fa-draw-polygon mr-1"></i> 1 Peta Boundary
+                        </span>
+                        <button onclick="switchMapIframe('boundary', this)" class="map-tab-btn w-full p-2 bg-slate-900 hover:bg-slate-700 rounded-lg border border-slate-700 text-center transition flex items-center justify-between px-3">
+                            <span id="btn-boundary-name" class="text-xs font-bold text-white">Sempadan Selangor</span>
+                            <span class="text-[9px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-mono">Boundary</span>
+                        </button>
+                    </div>
+
+                    <!-- BAHAGIAN PETA ANALISIS KHAS (SLOPE, HEATMAP, HOTSPOT) -->
+                    <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/80 shadow-md space-y-2">
+                        <span id="cat-analysis-title" class="text-[10px] font-black text-purple-400 uppercase tracking-wider block border-b border-slate-700 pb-1">
+                            <i class="fa-solid fa-layer-group mr-1"></i> Peta Analisis Khas
+                        </span>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="switchMapIframe('slope', this)" class="map-tab-btn p-2 bg-slate-900 hover:bg-slate-700 rounded-lg border border-slate-700 text-center transition">
+                                <i class="fa-solid fa-mountain text-xs text-purple-400 block mb-0.5"></i>
+                                <span class="text-xs font-bold block text-white">Slope</span>
+                                <span id="lbl-slope" class="text-[9px] text-white font-bold block">Kecerunan</span>
+                            </button>
+                            <button onclick="switchMapIframe('heatmap', this)" class="map-tab-btn p-2 bg-slate-900 hover:bg-slate-700 rounded-lg border border-slate-700 text-center transition">
+                                <i class="fa-solid fa-fire-flame-simple text-xs text-orange-500 block mb-0.5"></i>
+                                <span class="text-xs font-bold block text-white">Heatmap</span>
+                                <span id="lbl-heatmap" class="text-[9px] text-white font-bold block">Peta Haba</span>
+                            </button>
+                            <button onclick="switchMapIframe('hotspot_map', this)" class="map-tab-btn p-2 bg-slate-900 hover:bg-slate-700 rounded-lg border border-slate-700 text-center transition">
+                                <i class="fa-solid fa-fire text-xs text-rose-500 block mb-0.5"></i>
+                                <span class="text-xs font-bold block text-white">Hotspot</span>
+                                <span id="lbl-hotspot" class="text-[9px] text-white font-bold block">Titik Haba</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- KATEGORI SEBELAH KANAN: 3 PETA TAHUNAN -->
+                    <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/80 shadow-md space-y-2">
+                        <span id="cat-yearly-title" class="text-[10px] font-black text-amber-400 uppercase tracking-wider block border-b border-slate-700 pb-1">
+                            <i class="fa-solid fa-calendar-days mr-1"></i> 3 Peta Tahunan
+                        </span>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="switchMapIframe('2006', this)" class="map-tab-btn p-2 bg-slate-900 hover:bg-slate-700 rounded-lg border border-slate-700 text-center transition">
+                                <span class="text-xs font-bold block text-white">2006</span>
+                                <span class="lbl-temp-sub text-[9px] text-white font-bold block">Suhu</span>
+                            </button>
+                            <button onclick="switchMapIframe('2016', this)" class="map-tab-btn p-2 bg-slate-900 hover:bg-slate-700 rounded-lg border border-slate-700 text-center transition">
+                                <span class="text-xs font-bold block text-white">2016</span>
+                                <span class="lbl-temp-sub text-[9px] text-white font-bold block">Suhu</span>
+                            </button>
+                            <button onclick="switchMapIframe('2025', this)" class="map-tab-btn p-2 bg-slate-900 hover:bg-slate-700 rounded-lg border border-slate-700 text-center transition">
+                                <span class="text-xs font-bold block text-white">2025</span>
+                                <span class="lbl-temp-sub text-[9px] text-white font-bold block">Suhu</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- KATEGORI SEBELAH KANAN: 2 PETA PERDEKAD -->
+                    <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/80 shadow-md space-y-2">
+                        <span id="cat-decade-title" class="text-[10px] font-black text-sky-400 uppercase tracking-wider block border-b border-slate-700 pb-1">
+                            <i class="fa-solid fa-chart-line mr-1"></i> 2 Peta Perdekad
+                        </span>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="switchMapIframe('dekad1', this)" class="map-tab-btn p-2 bg-slate-900 hover:bg-slate-700 rounded-lg border border-slate-700 text-center transition">
+                                <span class="text-xs font-bold block text-white">2006 - 2016</span>
+                                <span class="lbl-decade-sub1 text-[9px] text-white font-bold block">Dekad 1</span>
+                            </button>
+                            <button onclick="switchMapIframe('dekad2', this)" class="map-tab-btn p-2 bg-slate-900 hover:bg-slate-700 rounded-lg border border-slate-700 text-center transition">
+                                <span class="text-xs font-bold block text-white">2016 - 2025</span>
+                                <span class="lbl-decade-sub2 text-[9px] text-white font-bold block">Dekad 2</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- KATEGORI SEBELAH KANAN: PETA TREND SUHU -->
+                    <div class="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700/80 shadow-md space-y-2">
+                        <span id="cat-trend-title" class="text-[10px] font-black text-rose-400 uppercase tracking-wider block border-b border-slate-700 pb-1">
+                            <i class="fa-solid fa-temperature-arrow-up mr-1"></i> Peta Trend Suhu
+                        </span>
+                        <button onclick="switchMapIframe('trend', this)" class="map-tab-btn w-full p-2 bg-slate-900 hover:bg-slate-700 rounded-lg border border-slate-700 text-center transition flex items-center justify-between px-3">
+                            <span id="btn-trend-name" class="text-xs font-bold text-white">Analisis Trend Suhu</span>
+                            <span class="text-[9px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded font-mono">Trend</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+    <!-- PROJECT OVERVIEW SECTION -->
+    <section id="project-overview" class="max-w-7xl mx-auto px-4 py-14 space-y-10">
+        
+        <div class="border-l-4 border-gov-blue pl-4 space-y-2">
+            <span id="overview-tag" class="text-xs font-black text-gov-blue uppercase tracking-widest flex items-center gap-1.5">
+                <i class="fa-solid fa-circle-info text-gov-yellow"></i> Gambaran Keseluruhan Projek
+            </span>
+            <h2 id="overview-title" class="text-2xl sm:text-3xl font-black text-gov-blueDark tracking-tight">
+                Memahami Suhu Alam Sekitar & Taburan Haba di Negeri Selangor
+            </h2>
+            <p id="overview-desc" class="text-sm text-black font-bold max-w-4xl leading-relaxed">
+                Platform WebGIS Projek Tahun Akhir (FYP) ini dibangunkan untuk menganalisis, memetakan, dan memantau taburan suhu alam sekitar di seluruh daerah Negeri Selangor. Dengan mengintegrasikan data cerapan rasmi daripada Jabatan Meteorologi Malaysia (MetMalaysia) bersama kaedah Sistem Maklumat Geografi (GIS), sistem ini membolehkan pengguna memvisualisasikan corak suhu, perbandingan temporal, serta zon pulau haba bandar (Urban Heat Island) secara interaktif.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/80 p-6 rounded-2xl shadow-sm hover:shadow-md transition group">
+                <div class="w-12 h-12 bg-amber-500 text-white rounded-xl flex items-center justify-center text-xl font-bold mb-4 shadow-md group-hover:scale-105 transition-transform">
+                    <i class="fa-solid fa-temperature-high"></i>
+                </div>
+                <h3 id="card1-title" class="text-base font-black text-gov-blueDark mb-2">Suhu Alam Sekitar</h3>
+                <p id="card1-desc" class="text-xs text-black leading-relaxed font-bold">
+                    Penilaian dan pemetaan suhu alam sekitar dijalankan secara terperinci bagi mengenal pasti julat haba, perbezaan mikroiklim, serta kawasan yang mencatatkan suhu tinggi mengikut jenis guna tanah setempat.
+                </p>
+            </div>
+
+            <div class="bg-gradient-to-br from-sky-50 to-blue-50 border border-sky-200/80 p-6 rounded-2xl shadow-sm hover:shadow-md transition group">
+                <div class="w-12 h-12 bg-sky-600 text-white rounded-xl flex items-center justify-center text-xl font-bold mb-4 shadow-md group-hover:scale-105 transition-transform">
+                    <i class="fa-solid fa-cloud-sun"></i>
+                </div>
+                <h3 id="card2-title" class="text-base font-black text-gov-blueDark mb-2">Pemantauan Iklim & Cuaca Semasa</h3>
+                <p id="card2-desc" class="text-xs text-black leading-relaxed font-bold">
+                    Pemantauan status iklim harian dan mikroiklim dilaksanakan mengikut zon daerah dan sempadan pentadbiran bagi menyokong penilaian keadaan persekitaran semasa secara tepat.
+                </p>
+            </div>
+
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200/80 p-6 rounded-2xl shadow-sm hover:shadow-md transition group">
+                <div class="w-12 h-12 bg-gov-blue text-white rounded-xl flex items-center justify-center text-xl font-bold mb-4 shadow-md group-hover:scale-105 transition-transform">
+                    <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <h3 id="card3-title" class="text-base font-black text-gov-blueDark mb-2">Skop Spasial Komprehensif</h3>
+                <p id="card3-desc" class="text-xs text-black leading-relaxed font-bold">
+                    Cakupan kajian merangkumi keseluruhan daerah di Selangor, Bandar Raya Shah Alam, serta kawasan pilihan raya Parlimen bagi tujuan pemetaan geospatial yang menyeluruh.
+                </p>
+            </div>
+
+        </div>
+
+    </section>
+
+    <!-- DISTRICT INTERACTIVE EXPLORER & ANALYTICS -->
+    <section id="analisis-daerah" class="bg-white py-14 border-y border-gov-border">
+        <div class="max-w-7xl mx-auto px-4 space-y-8">
+            
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gov-border pb-4">
+                <div>
+                    <span id="analysis-tag" class="text-xs font-black text-gov-blue uppercase tracking-widest block mb-0.5">Pengurusan Data GIS</span>
+                    <h2 id="analysis-title" class="text-2xl sm:text-3xl font-black text-gov-blueDark">
+                        Analisis Spasial Suhu Alam Sekitar Mengikut Daerah & Parlimen
+                    </h2>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <label id="lbl-select-district" for="district-select" class="text-xs font-bold text-gov-text shrink-0">Pilih Daerah / Kawasan:</label>
+                    <select id="district-select" onchange="onDistrictSelectChange(this.value)" class="bg-gov-bg border border-gov-border font-extrabold text-xs px-4 py-2.5 rounded-xl text-gov-blue focus:ring-2 focus:ring-gov-blue focus:outline-none transition shadow-xs">
+                        <option value="petaling">Petaling</option>
+                        <option value="shah_alam">Shah Alam</option>
+                        <option value="klang">Klang</option>
+                        <option value="sepang">Sepang</option>
+                        <option value="gombak">Gombak</option>
+                        <option value="hulu_langat">Hulu Langat</option>
+                        <option value="kuala_langat">Kuala Langat</option>
+                        <option value="kuala_selangor">Kuala Selangor</option>
+                        <option value="hulu_selangor">Hulu Selangor</option>
+                        <option value="sabak_bernam">Sabak Bernam</option>
+                        <option value="parlimen_selangor">Parlimen Selangor (Zon Pusat)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="district-detail-card" class="bg-gov-bg p-6 rounded-2xl border border-gov-border grid grid-cols-1 md:grid-cols-3 gap-6 shadow-sm">
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <div class="lg:col-span-7 bg-gov-bg p-6 rounded-2xl border border-gov-border space-y-4 shadow-sm">
+                    <div class="flex justify-between items-center border-b border-gov-border pb-3">
+                        <h3 id="chart1-title" class="text-sm font-black text-gov-blueDark flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-amber-500"></i> Trend Suhu Purata Alam Sekitar Selangor (2006 - 2025)
+                        </h3>
+                        <span id="chart1-badge" class="text-[10px] bg-gov-blue/10 text-gov-blue font-bold px-2.5 py-0.5 rounded-full">Purata Negeri</span>
+                    </div>
+                    <div class="h-64 sm:h-72 w-full">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Perbandingan Suhu Mengikut Daerah (Diubah kepada Suhu Min & Max Berkembar merentasi Daerah) -->
+                <div class="lg:col-span-5 bg-gov-bg p-6 rounded-2xl border border-gov-border space-y-4 shadow-sm">
+                    <div class="flex justify-between items-center border-b border-gov-border pb-3">
+                        <h3 id="chart2-title" class="text-sm font-black text-gov-blueDark flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-rose-500"></i> Perbandingan Suhu Min & Maks Daerah
+                        </h3>
+                        <span id="chart2-badge" class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2.5 py-0.5 rounded-full">Data GIS</span>
+                    </div>
+                    <div class="h-64 sm:h-72 w-full">
+                        <canvas id="compareChart"></canvas>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- KAWASAN HOTSPOT DI SELANGOR -->
+            <div class="bg-gov-bg p-6 rounded-2xl border border-gov-border space-y-6 shadow-sm mt-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gov-border pb-3 gap-2">
+                    <div>
+                        <h3 id="hotspot-title" class="text-base font-black text-gov-blueDark flex items-center gap-2">
+                            <i class="fa-solid fa-fire-flame-curved text-rose-600 animate-pulse"></i> Kawasan Hotspot di Selangor
+                        </h3>
+                        <p id="hotspot-subtitle" class="text-xs text-black font-bold mt-0.5">
+                            Pemetaan & Penilaian Indeks Kepatan Haba Tinggi (Urban Heat Island) Mengikut Lokasi Utama
+                        </p>
+                    </div>
+                    <span id="hotspot-badge" class="text-[10px] bg-rose-100 text-rose-800 border border-rose-200 font-extrabold px-3 py-1 rounded-full uppercase flex items-center gap-1">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Zon Haba Kritikal
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                    
+                    <!-- Visualisasi Carta Bar Hotspot (Indeks Keamatan UHI) -->
+                    <div class="lg:col-span-7 bg-white p-5 rounded-xl border border-gov-border shadow-xs">
+                        <h4 id="hotspot-chart-title" class="text-xs font-black text-gov-blueDark uppercase tracking-wider mb-3">
+                            Indeks Keamatan Hotspot Suhu Mengikut Zon Utama
+                        </h4>
+                        <div class="h-64 sm:h-72 w-full">
+                            <canvas id="hotspotChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Senarai Lokasi Hotspot Utama -->
+                    <div class="lg:col-span-5 space-y-3">
+                        <h4 id="hotspot-list-title" class="text-xs font-black text-gov-blueDark uppercase tracking-wider mb-2">
+                            Senarai Kawasan Hotspot Utama
+                        </h4>
+
+                        <div class="bg-white p-3.5 rounded-xl border-l-4 border-rose-600 shadow-xs space-y-1">
+                            <div class="flex justify-between items-center">
+                                <span id="hotspot-item1-title" class="text-xs font-extrabold text-gov-blueDark">1. Petaling Jaya & Subang Jaya (Petaling)</span>
+                                <span class="text-[10px] font-black bg-rose-100 text-rose-700 px-2 py-0.5 rounded">34.2 °C</span>
+                            </div>
+                            <p id="hotspot-item1-desc" class="text-[11px] text-black font-bold">Kepadatan struktur tinggi, permukaan bertar & kurang litupan vegetasi.</p>
+                        </div>
+
+                        <div class="bg-white p-3.5 rounded-xl border-l-4 border-orange-500 shadow-xs space-y-1">
+                            <div class="flex justify-between items-center">
+                                <span id="hotspot-item2-title" class="text-xs font-extrabold text-gov-blueDark">2. Pusat Bandar Shah Alam (Seksyen 7 & 13)</span>
+                                <span class="text-[10px] font-black bg-orange-100 text-orange-700 px-2 py-0.5 rounded">33.5 °C</span>
+                            </div>
+                            <p id="hotspot-item2-desc" class="text-[11px] text-black font-bold">Zon komersial aktif & kawasan perindustrian intensif haba.</p>
+                        </div>
+
+                        <div class="bg-white p-3.5 rounded-xl border-l-4 border-amber-500 shadow-xs space-y-1">
+                            <div class="flex justify-between items-center">
+                                <span id="hotspot-item3-title" class="text-xs font-extrabold text-gov-blueDark">3. Zon Perindustrian Port Klang (Klang)</span>
+                                <span class="text-[10px] font-black bg-amber-100 text-amber-700 px-2 py-0.5 rounded">32.8 °C</span>
+                            </div>
+                            <p id="hotspot-item3-desc" class="text-[11px] text-black font-bold">Aktiviti logistik, gudang berskala besar & pelepasan haba industri.</p>
+                        </div>
+
+                        <div class="bg-white p-3.5 rounded-xl border-l-4 border-yellow-500 shadow-xs space-y-1">
+                            <div class="flex justify-between items-center">
+                                <span id="hotspot-item4-title" class="text-xs font-extrabold text-gov-blueDark">4. Bandar Baru Salak Tinggi / KLIA (Sepang)</span>
+                                <span class="text-[10px] font-black bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">31.9 °C</span>
+                            </div>
+                            <p id="hotspot-item4-desc" class="text-[11px] text-black font-bold">Pembangunan perbandaran baru & kawasan lapang terdedah sinaran terik.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- PANDUAN MITIGASI SECTION -->
+    <section id="panduan-mitigasi" class="max-w-7xl mx-auto px-4 py-14 space-y-8">
+        <div class="border-b border-gov-border pb-4">
+            <span id="mitigasi-tag" class="text-xs font-black text-gov-blue uppercase tracking-widest block mb-0.5">Langkah Keselamatan & Cadangan Mitigasi</span>
+            <h2 id="mitigasi-title" class="text-2xl sm:text-3xl font-black text-gov-blueDark">
+                Panduan Keselamatan & Cadangan Mitigasi Suhu Tinggi
+            </h2>
+            <p id="mitigasi-subtitle" class="text-xs sm:text-sm text-black font-bold mt-1">
+                Panduan praktikal dan strategi mitigasi berasaskan pemetaan GIS untuk mengurangkan impak pendedahan haba serta fenomena Pulau Haba Bandar (*Urban Heat Island*).
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-7">
+            
+            <div class="bg-white p-7 rounded-2xl border border-gov-border shadow-sm space-y-5">
+                <div class="flex items-center gap-3.5 border-b border-gov-border pb-4">
+                    <div class="w-12 h-12 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center text-xl font-bold shrink-0">
+                        <i class="fa-solid fa-temperature-arrow-up"></i>
+                    </div>
+                    <div>
+                        <h3 id="safety-title" class="text-base font-black text-gov-blueDark">Langkah Keselamatan Diri & Awam</h3>
+                        <span id="safety-subtitle" class="text-xs text-black font-bold block">Panduan pencegahan semasa cuaca panas</span>
+                    </div>
+                </div>
+
+                <ul class="space-y-3.5 text-xs text-gov-text leading-relaxed font-medium">
+                    <li class="flex items-start gap-3">
+                        <i class="fa-solid fa-circle-check text-emerald-500 text-sm mt-0.5 shrink-0"></i>
+                        <span id="safety-li1"><b>Pengambilan Cecair Secara Berafiat:</b> Minum sekurang-kurangnya 2.5 hingga 3 liter air sehari untuk mengekalkan hidrasi badan, terutamanya ketika berada di kawasan perbandaran berkepadatan tinggi seperti Petaling, Shah Alam, dan Klang.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <i class="fa-solid fa-circle-check text-emerald-500 text-sm mt-0.5 shrink-0"></i>
+                        <span id="safety-li2"><b>Penjadualan Aktiviti Luar:</b> Hadkan aktiviti fizikal berintensiti tinggi di luar bangunan antara jam 11:00 pagi hingga 4:00 petang bagi mengelakkan risiko strok haba semasa julat suhu mencapai paras tertinggi.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <i class="fa-solid fa-circle-check text-emerald-500 text-sm mt-0.5 shrink-0"></i>
+                        <span id="safety-li3"><b>Pemilihan Pakaian Sesuai:</b> Gunakan pakaian yang longgar, berasaskan fabrik ringan, serta berwarna cerah bagi meminimumkan penyerapan dan pemantulan haba matahari.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <i class="fa-solid fa-circle-check text-emerald-500 text-sm mt-0.5 shrink-0"></i>
+                        <span id="safety-li4"><b>Pemantauan Golongan Berisiko Tinggi:</b> Berikan perhatian khusus kepada warga emas, kanak-kanak, serta individu berpenyakit kronik dengan memastikan sistem pengudaraan di kediaman sentiasa optimum.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="bg-white p-7 rounded-2xl border border-gov-border shadow-sm space-y-5">
+                <div class="flex items-center gap-3.5 border-b border-gov-border pb-4">
+                    <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl font-bold shrink-0">
+                        <i class="fa-solid fa-tree-city"></i>
+                    </div>
+                    <div>
+                        <h3 id="urban-title" class="text-base font-black text-gov-blueDark">Cadangan Mitigasi Perancangan Bandar (GIS)</h3>
+                        <span id="urban-subtitle" class="text-xs text-black font-bold block">Strategi pengurusan iklim & alam sekitar</span>
+                    </div>
+                </div>
+
+                <ul class="space-y-3.5 text-xs text-gov-text leading-relaxed font-medium">
+                    <li class="flex items-start gap-3">
+                        <i class="fa-solid fa-leaf text-emerald-600 text-sm mt-0.5 shrink-0"></i>
+                        <span id="urban-li1"><b>Memperbanyakkan Pokok & Laluan Hijau :</b> Perbanyakkan tanaman pokok dan kawasan berumput di kawasan bandar yang padat supaya proses sejatan semula jadi daripada tumbuhan (evapotranspirasi) dapat membantu menurunkan suhu sekitar.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <i class="fa-solid fa-leaf text-emerald-600 text-sm mt-0.5 shrink-0"></i>
+                        <span id="urban-li2"><b>Bumbung & Dinding Pantul Haba:</b> Galakkan premis kilang dan bangunan komersial menggunakan cat cerah atau bahan khas yang tinggi kadar pantulan habanya (albedo) supaya tidak menyerap bahang matahari.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <i class="fa-solid fa-leaf text-emerald-600 text-sm mt-0.5 shrink-0"></i>
+                        <span id="urban-li3"><b>Mencari Lokasi Strategik Guna GIS:</b> Manfaatkan teknologi peta digital (GIS) untuk mencari kawasan paling sesuai membina taman rekreasi atau tempat teduh awam bagi mengurangkan bahang panas.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <i class="fa-solid fa-leaf text-emerald-600 text-sm mt-0.5 shrink-0"></i>
+                        <span id="urban-li4"><b>Tegas Dalam Isu Pembakaran Terbuka:</b> Memantau ketat aktiviti pembakaran sampah atau jerami supaya jerebu tempatan tidak terperangkap dan memburukkan lagi cuaca panas.</span>
+                    </li>
+                </ul>
+            </div>
+
+        </div>
+        
+    </section>
+
+    <!-- RESEARCH TEAM SECTION (BEREMPAT) -->
+    <section id="pasukan-penyelidik" class="bg-gov-bg py-14 border-t border-gov-border">
+        <div class="max-w-7xl mx-auto px-4 space-y-10">
+            
+            <div class="text-center max-w-2xl mx-auto space-y-2">
+                <span id="team-tag" class="text-xs font-black text-gov-blue uppercase tracking-widest bg-gov-blue/10 px-3.5 py-1 rounded-full inline-block">
+                    Ahli Kumpulan Projek FYP
+                </span>
+                <h2 id="team-title" class="text-2xl sm:text-3xl font-black text-gov-blueDark">Kumpulan Penyelidik GIS</h2>
+                <p id="team-subtitle" class="text-xs sm:text-sm text-black font-bold">Ahli-ahli kumpulan yang terlibat dalam menjayakan Analisis Spasial & Pemetaan Suhu Selangor.</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                
+                <div class="bg-white p-6 rounded-2xl border border-gov-border shadow-sm hover:shadow-md transition text-center space-y-3 group">
+                    <div class="relative w-28 h-28 mx-auto">
+                        <img src="Puan.jpeg" alt="Nazatul Fariza" class="w-full h-full rounded-full border-4 border-gov-yellow object-cover object-top shadow-md">
+                        <span class="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center text-[10px] text-white"><i class="fa-solid fa-check"></i></span>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-black text-gov-blueDark">Nazatul Fariza binti Bakri</h4>
+                        <span id="member1-role" class="text-xs text-black font-bold block mt-0.5">Penyelia Projek</span>
+                    </div>
+                    <span id="member1-tag" class="text-[10px] bg-gov-blue/10 text-gov-blue px-3 py-1 rounded-full font-extrabold inline-block">Pensyarah Geomatik</span>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl border border-gov-border shadow-sm hover:shadow-md transition text-center space-y-3 group">
+                    <div class="relative w-28 h-28 mx-auto">
+                        <img src="pijoy.jpeg" alt="Pijoy" class="w-full h-full rounded-full border-4 border-gov-yellow object-cover shadow-md group-hover:scale-105 transition-transform">
+                        <span class="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center text-[10px] text-white"><i class="fa-solid fa-check"></i></span>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-black text-gov-blueDark">Muhammad Farizul Azuan bin Yusof</h4>
+                        <span id="member2-role" class="text-xs text-black font-bold block mt-0.5">Ahli Kumpulan</span>
+                    </div>
+                    <span id="member2-tag" class="text-[10px] bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full font-extrabold inline-block">Pelajar Geomatik</span>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl border border-gov-border shadow-sm hover:shadow-md transition text-center space-y-3 group">
+                    <div class="relative w-28 h-28 mx-auto">
+                        <img src="iman.jpg.jpg" alt="Iman Hakimi" class="w-full h-full rounded-full border-4 border-gov-yellow object-cover shadow-md group-hover:scale-105 transition-transform">
+                        <span class="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center text-[10px] text-white"><i class="fa-solid fa-check"></i></span>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-black text-gov-blueDark">Iman Hakimi Bin Amran</h4>
+                        <span id="member3-role" class="text-xs text-black font-bold block mt-0.5">Ahli Kumpulan</span>
+                    </div>
+                    <span id="member3-tag" class="text-[10px] bg-amber-100 text-amber-800 px-3 py-1 rounded-full font-extrabold inline-block">Pelajar Geomatik</span>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl border border-gov-border shadow-sm hover:shadow-md transition text-center space-y-3 group">
+                    <div class="relative w-28 h-28 mx-auto">
+                        <img src="ajmal.jpeg" alt="Ajmal" class="w-full h-full rounded-full border-4 border-gov-yellow object-cover shadow-md group-hover:scale-105 transition-transform">
+                        <span class="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center text-[10px] text-white"><i class="fa-solid fa-check"></i></span>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-black text-gov-blueDark">Mohamad Adam Ajmal bin Mohamad Nor Safuan</h4>
+                        <span id="member4-role" class="text-xs text-black font-bold block mt-0.5">Ahli Kumpulan</span>
+                    </div>
+                    <span id="member4-tag" class="text-[10px] bg-purple-100 text-purple-800 px-3 py-1 rounded-full font-extrabold inline-block">Pelajar Geomatik</span>
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer id="hubungi" class="bg-gov-blueDark text-white pt-12 pb-8 border-t-4 border-gov-yellow text-xs font-medium">
+        <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b border-white/10">
+            
+            <div class="space-y-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 bg-gov-yellow text-gov-blueDark font-black rounded-xl flex items-center justify-center text-lg shadow-sm">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                    </div>
+                    <span class="font-black text-base text-gov-yellow tracking-tight">PROJEK TAHUN AKHIR (FYP)</span>
+                </div>
+                <p id="footer-about" class="text-white leading-relaxed text-[11px] font-medium">
+                    Sistem Pemantauan & Analisis Spasial Suhu Alam Sekitar Negeri Selangor Menggunakan GIS. Disediakan sebagai Projek Akhir Tahun (FYP).
+                </p>
+            </div>
+
+            <div class="space-y-2.5">
+                <h4 id="footer-nav-title" class="font-extrabold text-gov-yellow text-sm uppercase tracking-wider">Pautan Navigasi Pantas</h4>
+                <ul class="space-y-2 text-white text-[11px] font-medium">
+                    <li><a href="#peta-gis" class="hover:text-gov-yellow transition flex items-center gap-1.5"><i class="fa-solid fa-angle-right text-[9px] text-gov-yellow"></i> <span id="ft-nav1">Peta Interaktif Suhu</span></a></li>
+                    <li><a href="#project-overview" class="hover:text-gov-yellow transition flex items-center gap-1.5"><i class="fa-solid fa-angle-right text-[9px] text-gov-yellow"></i> <span id="ft-nav2">Gambaran Projek</span></a></li>
+                    <li><a href="#gis-methodology" class="hover:text-gov-yellow transition flex items-center gap-1.5"><i class="fa-solid fa-angle-right text-[9px] text-gov-yellow"></i> <span id="ft-nav3">Metodologi GIS</span></a></li>
+                    <li><a href="#analisis-daerah" class="hover:text-gov-yellow transition flex items-center gap-1.5"><i class="fa-solid fa-angle-right text-[9px] text-gov-yellow"></i> <span id="ft-nav4">Analisis Suhu Daerah</span></a></li>
+                    <li><a href="#panduan-mitigasi" class="hover:text-gov-yellow transition flex items-center gap-1.5"><i class="fa-solid fa-angle-right text-[9px] text-gov-yellow"></i> <span id="ft-nav5">Panduan Mitigasi Suhu</span></a></li>
+                </ul>
+            </div>
+
+            <div class="space-y-3">
+                <h4 id="footer-contact-title" class="font-extrabold text-gov-yellow text-sm uppercase tracking-wider">Hubungi Kami</h4>
+                <div class="text-white text-[11px] space-y-2 font-medium">
+                    <p class="flex items-center gap-2"><i class="fa-solid fa-envelope text-gov-yellow"></i> imanhakimi6017@gmail.com</p>
+                    <p class="flex items-center gap-2"><i class="fa-solid fa-phone text-gov-yellow"></i> +6012-949 5807</p>
+                    <p id="footer-dept" class="flex items-center gap-2"><i class="fa-solid fa-building-columns text-gov-yellow"></i> Jabatan Geomatik, Politeknik Ungku Omar</p>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="max-w-7xl mx-auto px-4 pt-6 flex flex-col sm:flex-row justify-between items-center text-[11px] text-white gap-2 font-bold">
+            <p id="footer-copy">© 2026 Pasukan Penyelidik FYP GIS Politeknik Ungku Omar. Hak Cipta Terpelihara.</p>
+            <p id="footer-browser">Paparan Terbaik: Chrome / Firefox / Edge / Safari</p>
+        </div>
+    </footer>
+
+<!-- JAVASCRIPT LOGIC ENGINE -->
+
+    <script>
+        const mapConfigs = {
+            "default": {
+                title: "Peta Trend Suhu Selangor",
+                desc: "Paparan lapisan trend suhu alam sekitar Negeri Selangor.",
+                src: "qgis2web_2026_09_26-02_34_30_100298\\qgis2web_2026_09_26-02_34_30_100298\\index.html"
+            },
+            "slope": {
+                title: "Peta Kecerunan (Slope Map)",
+                desc: "Paparan pemetaan kecerunan tanah Negeri Selangor bagi analisis topografi.",
+                src: "PETA LAST4\\qgis2web_2026_10_02-12_29_42_257162\\index.html"
+            },
+            "heatmap": {
+                title: "Peta Haba (Heatmap)",
+                desc: "Pemetaan kepadatan dan taburan taburan haba persekitaran Negeri Selangor.",
+                src: "PETA LAST4\\HEATMAP\\index.html"
+            },
+            "hotspot_map": {
+                title: "Peta Hotspot Suhu (Heat Hotspot Map)",
+                desc: "Pemetaan taburan titik haba tinggi dan zon Urban Heat Island (UHI).",
+                src: "PETA LAST4\\HOTSPOT\\index.html"
+            },
+            "2006": {
+                title: "Peta Spasial Suhu Tahun 2006",
+                desc: "Pemetaan taburan suhu persekitaran Negeri Selangor bagi tahun 2006.",
+                src: "PETA\\2006\\index.html"
+            },
+            "2016": {
+                title: "Peta Spasial Suhu Tahun 2016",
+                desc: "Pemetaan taburan suhu persekitaran Negeri Selangor bagi tahun 2016.",
+                src: "PETA\\2016\\index.html"
+            },
+            "2025": {
+                title: "Peta Spasial Suhu Tahun 2025",
+                desc: "Pemetaan taburan suhu persekitaran Negeri Selangor bagi tahun 2025.",
+                src: "PETA\\2025\\index.html"
+            },
+            "dekad1": {
+                title: "Peta Perubahan Suhu (Dekad 2006 - 2016)",
+                desc: "Analisis perubahan julat suhu per dekad bagi tempoh 2006 hingga 2016.",
+                src: "PETA\\PER0616\\index.html"
+            },
+            "dekad2": {
+                title: "Peta Perubahan Suhu (Dekad 2016 - 2025)",
+                desc: "Analisis perubahan julat suhu per dekad bagi tempoh 2016 hingga 2025.",
+                src: "PETA\\PER1625\\index.html"
+            },
+            "trend": {
+                title: "Peta Trend Suhu Selangor",
+                desc: "Paparan analisis trend perubahan suhu alam sekitar Negeri Selangor.",
+                src: "qgis2web_2026_09_26-02_34_30_100298\\qgis2web_2026_09_26-02_34_30_100298\\index.html"
+            },
+            "boundary": {
+                title: "Peta Sempadan Pentadbiran Selangor (Boundary)",
+                desc: "Sempadan vektor rasmi daerah dan parlimen Negeri Selangor.",
+                src: "PETA\\BOUNDARY\\index.html"
+            }
+        };
+
+        const districtData = {
+            "petaling": { name: "Petaling", temp: 33.8, builtup: "82%", weather: "Cerah", weatherIcon: "fa-sun text-amber-500", category: "Panas / Tinggi", coords: [3.107, 101.56], bounds: [[3.00, 101.48], [3.20, 101.65]], slope: "0° - 5° (Rata / Pamah)", elevation: "15m - 45m MSL", aspect: "Barat Daya", lulc: "Bandar & Industri" },
+            "shah_alam": { name: "Shah Alam", temp: 33.2, builtup: "79%", weather: "Cerah / Bermendung", weatherIcon: "fa-cloud-sun text-amber-500", category: "Panas / Tinggi", coords: [3.073, 101.518], bounds: [[3.00, 101.45], [3.15, 101.58]], slope: "0° - 8° (Pamah - Landai)", elevation: "12m - 50m MSL", aspect: "Selatan", lulc: "Pembangunan Perbandaran" },
+            "klang": { name: "Klang", temp: 32.1, builtup: "74%", weather: "Bermendung", weatherIcon: "fa-cloud text-slate-400", category: "Panas / Tinggi", coords: [3.044, 101.44], bounds: [[2.95, 101.30], [3.12, 101.52]], slope: "0° - 3° (Sangat Rata)", elevation: "2m - 15m MSL", aspect: "Barat (Pesisir)", lulc: "Pelabuhan & Perindustrian" },
+            "sepang": { name: "Sepang", temp: 30.5, builtup: "56%", weather: "Cerah", weatherIcon: "fa-sun text-amber-500", category: "Sederhana-Tinggi", coords: [2.81, 101.69], bounds: [[2.65, 101.55], [2.98, 101.80]], slope: "2° - 10° (Landai)", elevation: "10m - 60m MSL", aspect: "Tenggara", lulc: "Infrastruktur & Pertanian" },
+            "gombak": { name: "Gombak", temp: 27.2, builtup: "38%", weather: "Hujan Ringan", weatherIcon: "fa-cloud-rain text-sky-400", category: "Sederhana", coords: [3.25, 101.65], bounds: [[3.18, 101.52], [3.38, 101.80]], slope: "12° - 25° (Becerun)", elevation: "80m - 350m MSL", aspect: "Timur Laut", lulc: "Hutan & Pinggir Bandar" },
+            "hulu_langat": { name: "Hulu Langat", temp: 26.1, builtup: "29%", weather: "Hujan Ringan", weatherIcon: "fa-cloud-showers-heavy text-blue-500", category: "Sederhana-Rendah", coords: [3.08, 101.82], bounds: [[2.88, 101.70], [3.22, 101.95]], slope: "15° - 30° (Curam)", elevation: "100m - 500m MSL", aspect: "Timur", lulc: "Hutan Simpan & Lembangan" },
+            "kuala_langat": { name: "Kuala Langat", temp: 28.3, builtup: "34%", weather: "Cerah", weatherIcon: "fa-sun text-amber-500", category: "Sederhana", coords: [2.80, 101.50], bounds: [[2.70, 101.38], [2.92, 101.62]], slope: "0° - 4° (Rata)", elevation: "5m - 25m MSL", aspect: "Barat Daya", lulc: "Pertanian & Kelapa Sawit" },
+            "kuala_selangor": { name: "Kuala Selangor", temp: 27.4, builtup: "22%", weather: "Bermendung", weatherIcon: "fa-cloud text-slate-400", category: "Sederhana-Rendah", coords: [3.34, 101.25], bounds: [[3.18, 101.10], [3.50, 101.40]], slope: "0° - 5° (Rata)", elevation: "3m - 20m MSL", aspect: "Barat Laut", lulc: "Pertanian & Paya Bakau" },
+            "hulu_selangor": { name: "Hulu Selangor", temp: 24.2, builtup: "12%", weather: "Hujan Lebat", weatherIcon: "fa-cloud-showers-heavy text-indigo-500", category: "Sejuk / Rendah", coords: [3.56, 101.62], bounds: [[3.38, 101.45], [3.75, 101.80]], slope: "> 30° (Sangat Curam)", elevation: "150m - 800m MSL", aspect: "Utara", lulc: "Hutan Dipterokarpa / Gunung" },
+            "sabak_bernam": { name: "Sabak Bernam", temp: 25.8, builtup: "15%", weather: "Cerah / Awan Sebahagian", weatherIcon: "fa-cloud-sun text-amber-500", category: "Sejuk / Rendah", coords: [3.67, 100.98], bounds: [[3.52, 100.82], [3.85, 101.18]], slope: "0° - 2° (Sangat Rata)", elevation: "1m - 10m MSL", aspect: "Barat", lulc: "Sawah Padi & Pertanian" },
+            "parlimen_selangor": { name: "Parlimen Selangor (Zon Pusat)", temp: 31.6, builtup: "68%", weather: "Cerah", weatherIcon: "fa-sun text-amber-500", category: "Sederhana-Tinggi", coords: [3.15, 101.50], bounds: [[2.95, 101.35], [3.30, 101.70]], slope: "3° - 12° (Sederhana)", elevation: "20m - 80m MSL", aspect: "Selatan", lulc: "Pusat Pentadbiran & Komersial" }
+        };
+
+        let trendChart, compareChart, hotspotChart;
+
+        // --- FUNGSI KONTRAS ---
+        function toggleContrast() {
+            document.body.classList.toggle('high-contrast');
+        }
+
+        // --- FUNGSI BAHASA (BM & EN) ---
+        let currentLang = 'BM';
+        const translations = {
+            'BM': {
+                'txt-contrast': 'Kontras',
+                'header-portal-title': 'Spatial Analysis and Mapping of Environmental Temperature in Selangor Using GIS',
+                'header-portal-subtitle': 'Analisis Spasial & Pemetaan Suhu Alam Sekitar Menggunakan Sistem Maklumat Geografi (GIS)',
+                'badge-spatial': 'Analisis Spasial GIS',
+                'btn-search': 'Cari',
+                'nav-utama': 'Utama',
+                'nav-peta': 'Peta Spasial Suhu',
+                'nav-gambaran': 'Gambaran Projek',
+                'nav-metodologi': 'Metodologi GIS',
+                'nav-analisis': 'Analisis Daerah',
+                'nav-mitigasi': 'Panduan Mitigasi',
+                'nav-data': 'Data Open-GIS',
+                'nav-ahli': 'Ahli Kumpulan',
+                'mobile-menu-title': 'MENU PROJEK FYP',
+                'ticker-badge': 'HEBAHAN FYP',
+                'ticker-text': 'Pemetaan Taburan Suhu Alam Sekitar Bagi Daerah, Shah Alam & Parlimen Negeri Selangor Telah Dikemaskini Menggunakan Kaedah Analisis Spasial GIS Terkini. Data Terbuka Sedia Diakses Untuk Kajian Akademik.',
+                'hero-badge': 'Laporan Akhir Projek Penyelidikan Tahun Akhir (FYP)',
+                'hero-desc': 'Sistem pemetaan maklumat geospatial ini dibangunkan khas untuk menganalisis, memetakan, dan memantau taburan suhu alam sekitar serta variasi mikroiklim di kesemua daerah, kawasan Shah Alam, dan zon Parlimen Negeri Selangor secara berasaskan Sistem Maklumat Geografi (GIS).',
+                'btn-interactive-map': 'Akses Peta Spasial Interaktif',
+                'btn-download-gis': 'Muat Turun Data GIS',
+                'proj-status-title': 'Status Projek GIS',
+                'proj-status-val': 'LENGKAP',
+                'lbl-method': 'Kaedah Analisis:',
+                'lbl-format': 'Format Peta:',
+                'lbl-coverage': 'Liputan Kajian:',
+                'lbl-team': 'Ahli Kumpulan:',
+                'stat-lbl-1': 'Suhu Purata Selangor',
+                'stat-sub-1': 'Purata Keseluruhan Neg.',
+                'stat-lbl-2': 'Suhu Maksimum (Urban)',
+                'stat-sub-2': 'Zon Haba Tinggi (Petaling)',
+                'stat-lbl-3': 'Suhu Minimum (Hutan)',
+                'stat-sub-3': 'Zon Sejuk (Hulu Selangor)',
+                'stat-lbl-4': 'Kawasan Dipantau',
+                'stat-sub-4': 'Daerah & Shah Alam / Parlimen',
+                'map-section-title': 'Peta Spasial Suhu Alam Sekitar Selangor',
+                'map-section-subtitle': 'Pemetaan GIS Interaktif / Model Spatial QGIS2Web',
+                'lbl-district-search': 'daerah yang ingin di lihat:',
+                'cat-boundary-title': '1 Peta Boundary',
+                'btn-boundary-name': 'Sempadan Selangor',
+                'cat-analysis-title': 'Peta Analisis Khas',
+                'lbl-slope': 'Kecerunan',
+                'lbl-heatmap': 'Peta Haba',
+                'lbl-hotspot': 'Titik Haba',
+                'cat-yearly-title': '3 Peta Tahunan',
+                'cat-decade-title': '2 Peta Perdekad',
+                'cat-trend-title': 'Peta Trend Suhu',
+                'btn-trend-name': 'Analisis Trend Suhu',
+                'overview-tag': 'Gambaran Keseluruhan Projek',
+                'overview-title': 'Memahami Suhu Alam Sekitar & Taburan Haba di Negeri Selangor',
+                'overview-desc': 'Platform WebGIS Projek Tahun Akhir (FYP) ini dibangunkan untuk menganalisis, memetakan, dan memantau taburan suhu alam sekitar di seluruh daerah Negeri Selangor. Dengan mengintegrasikan data cerapan rasmi daripada Jabatan Meteorologi Malaysia (MetMalaysia) bersama kaedah Sistem Maklumat Geografi (GIS), sistem ini membolehkan pengguna memvisualisasikan corak suhu, perbandingan temporal, serta zon pulau haba bandar (Urban Heat Island) secara interaktif.',
+                'obj-title': 'Objektif Utama Projek FYP',
+                'obj-1': 'Menganalisis taburan suhu persekitaran di Selangor.',
+                'obj-2': 'Menghasilkan peta suhu menggunakan GIS.',
+                'obj-3': 'Mengenal pasti kaitan antara guna tanah dan suhu.',
+                'card1-title': 'Suhu Alam Sekitar',
+                'card1-desc': 'Penilaian dan pemetaan suhu alam sekitar dijalankan secara terperinci bagi mengenal pasti julat haba, perbezaan mikroiklim, serta kawasan yang mencatatkan suhu tinggi mengikut jenis guna tanah setempat.',
+                'card2-title': 'Pemantauan Iklim & Cuaca Semasa',
+                'card2-desc': 'Pemantauan status iklim harian dan mikroiklim dilaksanakan mengikut zon daerah dan sempadan pentadbiran bagi menyokong penilaian keadaan persekitaran semasa secara tepat.',
+                'card3-title': 'Skop Spasial Komprehensif',
+                'card3-desc': 'Cakupan kajian merangkumi keseluruhan daerah di Selangor, Bandar Raya Shah Alam, serta kawasan pilihan raya Parlimen bagi tujuan pemetaan geospatial yang menyeluruh.',
+                'feat-tag': 'Keupayaan Platform WebGIS FYP',
+                'feat-title': 'Ciri-Ciri Interaktif WebGIS FYP',
+                'feat-desc': 'Platform ini dibina berasaskan HTML5 & Tailwind CSS menggunakan Visual Studio Code, menyediakan paparan lapisan QGIS2Web yang interaktif, carian lokasi daerah, carta analisis suhu, serta integrasi data yang pantas.',
+                'meth-tag': 'Aliran Kerja Penyelidikan GIS',
+                'meth-title': 'Metodologi Pemprosesan Data GIS Ke WebGIS',
+                'meth-desc': 'Aliran pemprosesan data daripada pemerolehan data mentah MetMalaysia sehingga integrasi aplikasi webGIS interaktif.',
+                'phase1-title': 'Pembelian Data MetMalaysia',
+                'phase1-desc': 'Data suhu tahunan dan bulanan bagi Selangor dibeli secara rasmi daripada portal MetMalaysia untuk mendapatkan maklumat cerapan yang tepat.',
+                'phase2-title': 'Pembersihan & Susunan Data',
+                'phase2-desc': 'Data mentah diurus, disusun, dan diformat menggunakan Google Sheets / Excel bagi memastikan nilai koordinat serta suhu sedia diimport ke perisian GIS.',
+                'phase3-title': 'Pemetaan & Analisis QGIS',
+                'phase3-desc': 'Data suhu diimport ke QGIS untuk menghasilkan peta tematik, analisis interpolasi spasial, trend perubahan suhu, serta peta kecerunan (slope) & haba.',
+                'phase4-title': 'Eksport Web2QGIS & Pembangunan Web',
+                'phase4-desc': 'Kesemua peta dieksport menggunakan plugin qgis2web dan diintegrasikan ke dalam laman web berasaskan HTML & Tailwind CSS menggunakan Visual Studio Code.',
+                'guide-title': 'Cara Membaca & Menganalisis Peta Suhu',
+                'guide1-title': '1. Semak Sempadan Daerah / Kawasan Kajian',
+                'guide1-desc': 'Gunakan fungsi carian daerah untuk meneliti zon spesifik seperti Petaling, Shah Alam, atau Klang bagi melihat sempadan pentadbiran dan taburan suhu tempatan.',
+                'guide2-title': '2. Menganalisis Gradien Warna Haba',
+                'guide2-desc': 'Perhatikan legenda warna: ton merah/oren menandakan kawasan bertemperatur tinggi (>32°C), manakala ton hijau/biru menunjukkan zon bersuhu lebih sejuk atau dilindungi vegetasi.',
+                'guide3-title': '3. Hubungkaitkan Guna Tanah & Trend',
+                'guide3-desc': 'Bandingkan peta suhu antara tahun (2006, 2016, 2025) untuk mengesan corak kenaikan haba serta perkaitannya dengan kawasan perbandaran dan perindustrian.',
+                'analysis-tag': 'Pengurusan Data GIS',
+                'analysis-title': 'Analisis Spasial Suhu Alam Sekitar Mengikut Daerah & Parlimen',
+                'lbl-select-district': 'Pilih Daerah / Kawasan:',
+                'chart1-title': 'Trend Suhu Purata Alam Sekitar Selangor (2006 - 2025)',
+                'chart1-badge': 'Purata Negeri',
+                'chart2-title': 'Perbandingan Suhu Min & Maks Daerah',
+                'chart2-badge': 'Data GIS',
+                'hotspot-title': 'Kawasan Hotspot di Selangor',
+                'hotspot-subtitle': 'Pemetaan & Penilaian Indeks Kepatan Haba Tinggi (Urban Heat Island) Mengikut Lokasi Utama',
+                'hotspot-badge': 'Zon Haba Kritikal',
+                'hotspot-chart-title': 'Indeks Keamatan Hotspot Suhu Mengikut Zon Utama',
+                'hotspot-list-title': 'Senarai Kawasan Hotspot Utama',
+                'hotspot-item1-title': '1. Petaling Jaya & Subang Jaya (Petaling)',
+                'hotspot-item1-desc': 'Kepadatan struktur tinggi, permukaan bertar & kurang litupan vegetasi.',
+                'hotspot-item2-title': '2. Pusat Bandar Shah Alam (Seksyen 7 & 13)',
+                'hotspot-item2-desc': 'Zon komersial aktif & kawasan perindustrian intensif haba.',
+                'hotspot-item3-title': '3. Zon Perindustrian Port Klang (Klang)',
+                'hotspot-item3-desc': 'Aktiviti logistik, gudang berskala besar & pelepasan haba industri.',
+                'hotspot-item4-title': '4. Bandar Baru Salak Tinggi / KLIA (Sepang)',
+                'hotspot-item4-desc': 'Pembangunan perbandaran baru & kawasan lapang terdedah sinaran terik.',
+                'mitigasi-tag': 'Langkah Keselamatan & Cadangan Mitigasi',
+                'mitigasi-title': 'Panduan Keselamatan & Cadangan Mitigasi Suhu Tinggi',
+                'mitigasi-subtitle': 'Panduan praktikal dan strategi mitigasi berasaskan pemetaan GIS untuk mengurangkan impak pendedahan haba serta fenomena Pulau Haba Bandar (*Urban Heat Island*).',
+                'safety-title': 'Langkah Keselamatan Diri & Awam',
+                'safety-subtitle': 'Panduan pencegahan semasa cuaca panas',
+                'safety-li1': '<b>Pengambilan Cecair Secara Berafiat:</b> Minum sekurang-kurangnya 2.5 hingga 3 liter air sehari untuk mengekalkan hidrasi badan, terutamanya ketika berada di kawasan perbandaran berkepadatan tinggi seperti Petaling, Shah Alam, dan Klang.',
+                'safety-li2': '<b>Penjadualan Aktiviti Luar:</b> Hadkan aktiviti fizikal berintensiti tinggi di luar bangunan antara jam 11:00 pagi hingga 4:00 petang bagi mengelakkan risiko strok haba semasa julat suhu mencapai paras tertinggi.',
+                'safety-li3': '<b>Pemilihan Pakaian Sesuai:</b> Gunakan pakaian yang longgar, berasaskan fabrik ringan, serta berwarna cerah bagi meminimumkan penyerapan dan pemantulan haba matahari.',
+                'safety-li4': '<b>Pemantauan Golongan Berisiko Tinggi:</b> Berikan perhatian khusus kepada warga emas, kanak-kanak, serta individu berpenyakit kronik dengan memastikan sistem pengudaraan di kediaman sentiasa optimum.',
+                'urban-title': 'Cadangan Mitigasi Perancangan Bandar (GIS)',
+                'urban-subtitle': 'Strategi pengurusan iklim & alam sekitar',
+                'urban-li1': '<b>Pembangunan Koridor Hijau (*Green Corridors*):</b> Memperluas liputan tumbuhan dan penanaman pokok di zon tepubina tinggi untuk merendahkan suhu permukaan melalui proses evapotranspirasi.',
+                'urban-li2': '<b>Aplikasi Bumbung Hijau & Permukaan Reflektif:</b> Menggalakkan penggunaan bahan pemantul haba ber-albedo tinggi (*Cool Roofs*) pada struktur perindustrian dan bangunan komersial.',
+                'urban-li3': '<b>Pemetaaan Strategik Zon Penyejukan:</b> Menggunakan maklumat spasial GIS bagi mengenal pasti lokasi optimum bagi penyediaan taman rekreasi awam dan zon perlindungan haba.',
+                'urban-li4': '<b>Kawalan Pembakaran Terbuka & Pelepasan Haba:</b> Menguatkuasakan pemantauan ketat terhadap aktiviti pembakaran terbuka bagi mengelakkan penumpuan jerebu tempatan yang boleh memerangkap haba permukaan.',
+                'download-tag': 'Data Open-GIS FYP',
+                'download-title': 'Pusat Muat Turun Data Spasial & Laporan GIS',
+                'download-subtitle': 'Set data sedia untuk dimuat turun bagi tujuan analisis GIS, perancangan bandar, dan rujukan akademik.',
+                'th-dataset': 'Nama Set Data / Laporan',
+                'th-format': 'Format Data GIS',
+                'th-size': 'Saiz Fail',
+                'th-date': 'Tarikh Kemaskini',
+                'th-action': 'Tindakan',
+                'file1-name': 'Layers Spasial Suhu Alam Sekitar Selangor (2006, 2016, 2025)',
+                'file1-desc': 'Grid Vektor & Raster Taburan Suhu Selangor Multi-Tahun',
+                'file2-name': 'Poligon Sempadan Daerah, Shah Alam & Parlimen',
+                'file2-desc': 'Vektor Sempadan Boundary Selangor',
+                'file3-name': 'Laporan Analisis Spasial Suhu Alam Sekitar Selangor',
+                'file3-desc': 'Laporan Kajian Akhir FYP GIS',
+                'team-tag': 'Ahli Kumpulan Projek FYP',
+                'team-title': 'Kumpulan Penyelidik GIS',
+                'team-subtitle': 'Ahli-ahli kumpulan yang terlibat dalam menjayakan Analisis Spasial & Pemetaan Suhu Selangor.',
+                'member1-role': 'Penyelia Projek',
+                'member1-tag': 'Pensyarah Geomatik',
+                'member2-role': 'Ahli Kumpulan',
+                'member2-tag': 'Pelajar Geomatik',
+                'member3-role': 'Ahli Kumpulan',
+                'member3-tag': 'Pelajar Geomatik',
+                'member4-role': 'Ahli Kumpulan',
+                'member4-tag': 'Pelajar Geomatik',
+                'footer-about': 'Sistem Pemantauan & Analisis Spasial Suhu Alam Sekitar Negeri Selangor Menggunakan GIS. Disediakan sebagai Projek Akhir Tahun (FYP).',
+                'footer-nav-title': 'Pautan Navigasi Pantas',
+                'ft-nav1': 'Peta Interaktif Suhu',
+                'ft-nav2': 'Gambaran Projek',
+                'ft-nav3': 'Metodologi GIS',
+                'ft-nav4': 'Analisis Suhu Daerah',
+                'ft-nav5': 'Panduan Mitigasi Suhu',
+                'ft-nav6': 'Set Data Open-GIS',
+                'footer-contact-title': 'Hubungi Kami',
+                'footer-dept': 'Jabatan Geomatik, Politeknik Ungku Omar',
+                'footer-copy': '© 2026 Pasukan Penyelidik FYP GIS Politeknik Ungku Omar. Hak Cipta Terpelihara.',
+                'footer-browser': 'Paparan Terbaik: Chrome / Firefox / Edge / Safari'
+            },
+            'EN': {
+                'txt-contrast': 'Contrast',
+                'header-portal-title': 'Spatial Analysis and Mapping of Environmental Temperature in Selangor Using GIS',
+                'header-portal-subtitle': 'Spatial Analysis & Mapping of Environmental Temperature Using Geographic Information System (GIS)',
+                'badge-spatial': 'GIS Spatial Analysis',
+                'btn-search': 'Search',
+                'nav-utama': 'Home',
+                'nav-peta': 'Temperature Spatial Map',
+                'nav-gambaran': 'Project Overview',
+                'nav-metodologi': 'GIS Methodology',
+                'nav-analisis': 'District Analysis',
+                'nav-mitigasi': 'Mitigation Guide',
+                'nav-data': 'Open-GIS Data',
+                'nav-ahli': 'Research Team',
+                'mobile-menu-title': 'FYP PROJECT MENU',
+                'ticker-badge': 'FYP ANNOUNCEMENT',
+                'ticker-text': 'Environmental Temperature Distribution Mapping for Districts, Shah Alam & Parliamentary Zones of Selangor State Has Been Updated Using Latest GIS Spatial Analysis Methods. Open Data Ready for Academic Research.',
+                'hero-badge': 'Final Year Research Project (FYP) Final Report',
+                'hero-desc': 'This geospatial information mapping system is specially developed to analyze, map, and monitor environmental temperature distribution and microclimate variations across all districts, Shah Alam area, and Parliamentary zones of Selangor using Geographic Information Systems (GIS).',
+                'btn-interactive-map': 'Access Interactive Spatial Map',
+                'btn-download-gis': 'Download GIS Data',
+                'proj-status-title': 'GIS Project Status',
+                'proj-status-val': 'COMPLETE',
+                'lbl-method': 'Analysis Method:',
+                'lbl-format': 'Map Format:',
+                'lbl-coverage': 'Study Coverage:',
+                'lbl-team': 'Team Members:',
+                'stat-lbl-1': 'Selangor Average Temp',
+                'stat-sub-1': 'State Overall Average',
+                'stat-lbl-2': 'Maximum Temp (Urban)',
+                'stat-sub-2': 'High Heat Zone (Petaling)',
+                'stat-lbl-3': 'Minimum Temp (Forest)',
+                'stat-sub-3': 'Cool Zone (Hulu Selangor)',
+                'stat-lbl-4': 'Monitored Areas',
+                'stat-sub-4': 'Districts & Shah Alam / Parliament',
+                'map-section-title': 'Selangor Environmental Temperature Spatial Map',
+                'map-section-subtitle': 'Interactive GIS Mapping / QGIS2Web Spatial Model',
+                'lbl-district-search': 'district to view:',
+                'cat-boundary-title': '1 Boundary Map',
+                'btn-boundary-name': 'Selangor Boundary',
+                'cat-analysis-title': 'Special Analysis Maps',
+                'lbl-slope': 'Slope',
+                'lbl-heatmap': 'Heatmap',
+                'lbl-hotspot': 'Hotspot',
+                'cat-yearly-title': '3 Yearly Maps',
+                'cat-decade-title': '2 Decadal Maps',
+                'cat-trend-title': 'Temperature Trend Map',
+                'btn-trend-name': 'Temperature Trend Analysis',
+                'overview-tag': 'Project Overview',
+                'overview-title': 'Understanding Environmental Temperature & Heat Distribution in Selangor',
+                'overview-desc': 'This Final Year Project (FYP) WebGIS platform is developed to analyze, map, and monitor environmental temperature distribution across all districts of Selangor. By integrating official observation data from the Malaysian Meteorological Department (MetMalaysia) with Geographic Information System (GIS) methods, this system enables users to interactively visualize temperature patterns, temporal comparisons, and Urban Heat Island zones.',
+                'obj-title': 'Main Objectives of FYP Project',
+                'obj-1': 'Analyze environmental temperature distribution in Selangor.',
+                'obj-2': 'Produce temperature maps using GIS.',
+                'obj-3': 'Identify the relationship between land use and temperature.',
+                'card1-title': 'Environmental Temperature',
+                'card1-desc': 'Assessment and mapping of environmental temperature are conducted in detail to identify heat ranges, microclimate differences, and areas recording high temperatures based on local land use types.',
+                'card2-title': 'Current Climate & Weather Monitoring',
+                'card2-desc': 'Daily climate status and microclimate monitoring are implemented according to district zones and administrative boundaries to support accurate current environmental condition assessments.',
+                'card3-title': 'Comprehensive Spatial Scope',
+                'card3-desc': 'The study coverage includes all districts in Selangor, Shah Alam City, and Parliamentary constituency areas for comprehensive geospatial mapping purposes.',
+                'feat-tag': 'FYP WebGIS Platform Capabilities',
+                'feat-title': 'FYP WebGIS Interactive Features',
+                'feat-desc': 'This platform is built on HTML5 & Tailwind CSS using Visual Studio Code, providing interactive QGIS2Web layer displays, district location searches, temperature analysis charts, and fast data integration.',
+                'meth-tag': 'GIS Research Workflow',
+                'meth-title': 'GIS Data Processing Methodology to WebGIS',
+                'meth-desc': 'Data processing workflow from MetMalaysia raw data acquisition to interactive webGIS application integration.',
+                'phase1-title': 'MetMalaysia Data Procurement',
+                'phase1-desc': 'Annual and monthly temperature data for Selangor are officially purchased from the MetMalaysia portal to obtain accurate observation information.',
+                'phase2-title': 'Data Cleaning & Organization',
+                'phase2-desc': 'Raw data is managed, organized, and formatted using Google Sheets / Excel to ensure coordinate and temperature values are ready for import into GIS software.',
+                'phase3-title': 'QGIS Mapping & Analysis',
+                'phase3-desc': 'Temperature data is imported into QGIS to produce thematic maps, spatial interpolation analysis, temperature change trends, and slope & heat maps.',
+                'phase4-title': 'Web2QGIS Export & Web Development',
+                'phase4-desc': 'All maps are exported using the qgis2web plugin and integrated into an HTML & Tailwind CSS based website using Visual Studio Code.',
+                'guide-title': 'How to Read & Analyze Temperature Maps',
+                'guide1-title': '1. Check District Boundaries / Study Area',
+                'guide1-desc': 'Use the district search function to examine specific zones such as Petaling, Shah Alam, or Klang to view administrative boundaries and local temperature distribution.',
+                'guide2-title': '2. Analyze Heat Color Gradients',
+                'guide2-desc': 'Observe the color legend: red/orange tones indicate high temperature areas (>32°C), while green/blue zones show cooler temperatures or vegetation cover.',
+                'guide3-title': '3. Correlate Land Use & Trends',
+                'guide3-desc': 'Compare temperature maps across years (2006, 2016, 2025) to detect heat increase patterns and their association with urban and industrial areas.',
+                'analysis-tag': 'GIS Data Management',
+                'analysis-title': 'Environmental Temperature Spatial Analysis by District & Parliament',
+                'lbl-select-district': 'Select District / Area:',
+                'chart1-title': 'Selangor Environmental Average Temperature Trend (2006 - 2025)',
+                'chart1-badge': 'State Average',
+                'chart2-title': 'District Min & Max Temperature Comparison',
+                'chart2-badge': 'GIS Data',
+                'hotspot-title': 'Hotspot Areas in Selangor',
+                'hotspot-subtitle': 'Mapping & Assessment of High Heat Intensity Index (Urban Heat Island) by Key Locations',
+                'hotspot-badge': 'Critical Heat Zone',
+                'hotspot-chart-title': 'Temperature Hotspot Intensity Index by Main Zone',
+                'hotspot-list-title': 'List of Main Hotspot Areas',
+                'hotspot-item1-title': '1. Petaling Jaya & Subang Jaya (Petaling)',
+                'hotspot-item1-desc': 'High structural density, paved surfaces & low vegetation cover.',
+                'hotspot-item2-title': '2. Shah Alam City Centre (Section 7 & 13)',
+                'hotspot-item2-desc': 'Active commercial zones & heat-intensive industrial areas.',
+                'hotspot-item3-title': '3. Port Klang Industrial Zone (Klang)',
+                'hotspot-item3-desc': 'Logistics activities, large-scale warehouses & industrial heat emissions.',
+                'hotspot-item4-title': '4. Bandar Baru Salak Tinggi / KLIA (Sepang)',
+                'hotspot-item4-desc': 'New urban development & exposed open areas under intense radiation.',
+                'mitigasi-tag': 'Safety Measures & Mitigation Recommendations',
+                'mitigasi-title': 'Safety Guidelines & High Temperature Mitigation Recommendations',
+                'mitigasi-subtitle': 'Practical guidelines and GIS-mapping-based mitigation strategies to reduce heat exposure impacts and Urban Heat Island phenomena.',
+                'safety-title': 'Personal & Public Safety Measures',
+                'safety-subtitle': 'Hot weather prevention guidelines',
+                'safety-li1': '<b>Adequate Fluid Intake:</b> Drink at least 2.5 to 3 liters of water a day to maintain body hydration, especially when in high-density urban areas like Petaling, Shah Alam, and Klang.',
+                'safety-li2': '<b>Outdoor Activity Scheduling:</b> Limit high-intensity physical activities outdoors between 11:00 AM and 4:00 PM to avoid the risk of heatstroke during peak temperature ranges.',
+                'safety-li3': '<b>Appropriate Clothing Selection:</b> Wear loose, lightweight fabric clothing in light colors to minimize solar heat absorption and reflection.',
+                'safety-li4': '<b>Monitoring High-Risk Groups:</b> Pay special attention to the elderly, children, and individuals with chronic illnesses by ensuring indoor ventilation systems remain optimal.',
+                'urban-title': 'Urban Planning Mitigation Recommendations (GIS)',
+                'urban-subtitle': 'Climate & environmental management strategies',
+                'urban-li1': '<b>Green Corridors Development:</b> Expand vegetation coverage and tree planting in high built-up zones to lower surface temperatures through evapotranspiration.',
+                'urban-li2': '<b>Green Roofs & Reflective Surfaces Application:</b> Encourage the use of high-albedo heat-reflecting materials (Cool Roofs) on industrial structures and commercial buildings.',
+                'urban-li3': '<b>Strategic Cooling Zone Mapping:</b> Utilize GIS spatial information to identify optimal locations for public recreational parks and heat protection zones.',
+                'urban-li4': '<b>Open Burning & Heat Emission Control:</b> Enforce strict monitoring of open burning activities to prevent local haze concentrations that can trap surface heat.',
+                'download-tag': 'Open-GIS FYP Data',
+                'download-title': 'Spatial Data Download Center & GIS Reports',
+                'download-subtitle': 'Datasets ready for download for GIS analysis, urban planning, and academic references.',
+                'th-dataset': 'Dataset / Report Name',
+                'th-format': 'GIS Data Format',
+                'th-size': 'File Size',
+                'th-date': 'Update Date',
+                'th-action': 'Action',
+                'file1-name': 'Selangor Environmental Temperature Spatial Layers (2006, 2016, 2025)',
+                'file1-desc': 'Multi-Year Selangor Temperature Distribution Vector & Raster Grid',
+                'file2-name': 'District, Shah Alam & Parliament Boundary Polygons',
+                'file2-desc': 'Selangor Boundary Vector',
+                'file3-name': 'Selangor Environmental Temperature Spatial Analysis Report',
+                'file3-desc': 'GIS Final Research Project Report',
+                'team-tag': 'FYP Project Team Members',
+                'team-title': 'GIS Research Team',
+                'team-subtitle': 'Team members involved in making the Spatial Analysis & Temperature Mapping of Selangor a success.',
+                'member1-role': 'Project Supervisor',
+                'member1-tag': 'Geomatics Lecturer',
+                'member2-role': 'Team Member',
+                'member2-tag': 'Geomatics Student',
+                'member3-role': 'Team Member',
+                'member3-tag': 'Geomatics Student',
+                'member4-role': 'Team Member',
+                'member4-tag': 'Geomatics Student',
+                'footer-about': 'Selangor Environmental Temperature Monitoring & Spatial Analysis System Using GIS. Prepared as a Final Year Project (FYP).',
+                'footer-nav-title': 'Quick Navigation Links',
+                'ft-nav1': 'Interactive Temp Map',
+                'ft-nav2': 'Project Overview',
+                'ft-nav3': 'GIS Methodology',
+                'ft-nav4': 'District Temp Analysis',
+                'ft-nav5': 'Temp Mitigation Guide',
+                'ft-nav6': 'Open-GIS Datasets',
+                'footer-contact-title': 'Contact Us',
+                'footer-dept': 'Geomatics Department, Politeknik Ungku Omar',
+                'footer-copy': '© 2026 GIS FYP Research Team, Politeknik Ungku Omar. All Rights Reserved.',
+                'footer-browser': 'Best Display: Chrome / Firefox / Edge / Safari'
+            }
+        };
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.getElementById('lang-bm').className = lang === 'BM' ? "px-2 py-0.5 bg-gov-yellow text-gov-blueDark rounded font-extrabold shadow-sm transition" : "px-2 py-0.5 hover:text-gov-yellow text-slate-300 transition";
+            document.getElementById('lang-en').className = lang === 'EN' ? "px-2 py-0.5 bg-gov-yellow text-gov-blueDark rounded font-extrabold shadow-sm transition" : "px-2 py-0.5 hover:text-gov-yellow text-slate-300 transition";
+
+            const texts = translations[lang];
+            for (let id in texts) {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerHTML = texts[id];
+                }
+            }
+
+            const multiEls = document.querySelectorAll('.lbl-temp-sub');
+            multiEls.forEach(el => { el.innerText = lang === 'BM' ? 'Suhu' : 'Temp'; });
+            const dec1 = document.querySelectorAll('.lbl-decade-sub1');
+            dec1.forEach(el => { el.innerText = lang === 'BM' ? 'Dekad 1' : 'Decade 1'; });
+            const dec2 = document.querySelectorAll('.lbl-decade-sub2');
+            dec2.forEach(el => { el.innerText = lang === 'BM' ? 'Dekad 2' : 'Decade 2'; });
+            const btndl = document.querySelectorAll('.btn-dl');
+            btndl.forEach(el => { el.innerHTML = `<i class="fa-solid fa-download"></i> ${lang === 'BM' ? 'Muat Turun' : 'Download'}`; });
+        }
+
+        async function searchAndZoomDistrict() {
+            const inputVal = document.getElementById('district-map-search').value.toLowerCase().trim();
+            const statusMsg = document.getElementById('search-status-msg');
+            
+            if (!inputVal) {
+                statusMsg.innerText = currentLang === 'BM' ? "Sila tulis nama daerah terlebih dahulu." : "Please type district name first.";
+                statusMsg.className = "text-[10px] text-amber-400 font-medium";
+                return;
+            }
+
+            statusMsg.innerText = currentLang === 'BM' ? "Mencari lokasi daerah..." : "Searching district location...";
+            statusMsg.className = "text-[10px] text-amber-300 font-medium";
+
+            let foundKey = null;
+            for (let key in districtData) {
+                if (key.includes(inputVal.replace(/\s+/g, '_')) || districtData[key].name.toLowerCase().includes(inputVal)) {
+                    foundKey = key;
+                    break;
+                }
+            }
+
+            let lat, lng, bounds;
+
+            if (foundKey) {
+                const district = districtData[foundKey];
+                lat = district.coords[0];
+                lng = district.coords[1];
+                bounds = district.bounds;
+                selectDistrict(foundKey);
+                statusMsg.innerText = currentLang === 'BM' ? `Menjumpai ${district.name}. Mengemaskini dan mengezum peta...` : `Found ${district.name}. Updating and zooming map...`;
+                statusMsg.className = "text-[10px] text-emerald-400 font-medium";
+            } else {
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(inputVal + ', Selangor, Malaysia')}`);
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        lat = parseFloat(data[0].lat);
+                        lng = parseFloat(data[0].lon);
+                        const bb = data[0].boundingbox;
+                        bounds = [[parseFloat(bb[0]), parseFloat(bb[2])], [parseFloat(bb[1]), parseFloat(bb[3])]];
+                        statusMsg.innerText = `${currentLang === 'BM' ? 'Lokasi dijumpai' : 'Location found'}: ${data[0].display_name}`;
+                        statusMsg.className = "text-[10px] text-emerald-400 font-medium";
+                    } else {
+                        statusMsg.innerText = currentLang === 'BM' ? "Daerah/lokasi tidak dijumpai. Sila semak ejaan." : "District/location not found. Please check spelling.";
+                        statusMsg.className = "text-[10px] text-rose-400 font-medium";
+                        return;
+                    }
+                } catch (err) {
+                    statusMsg.innerText = currentLang === 'BM' ? "Gagal membuat carian lokasi." : "Failed to search location.";
+                    statusMsg.className = "text-[10px] text-rose-400 font-medium";
+                    return;
+                }
+            }
+
+            const iframe = document.getElementById('map-iframe-display');
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage({
+                    type: 'zoomTo',
+                    lat: lat,
+                    lng: lng,
+                    zoom: 12,
+                    bounds: bounds,
+                    districtName: inputVal
+                }, '*');
+            }
+        }
+
+        function switchMapIframe(key, btnElement) {
+            const config = mapConfigs[key];
+            if (!config) return;
+
+            document.getElementById('map-iframe-display').src = config.src;
+
+            const buttons = document.querySelectorAll('.map-tab-btn');
+            buttons.forEach(b => b.classList.remove('active'));
+            if (btnElement) {
+                btnElement.classList.add('active');
+            }
+        }
+
+        function selectDistrict(key) {
+            const item = districtData[key];
+            if (!item) return;
+
+            document.getElementById('district-select').value = key;
+            updateDistrictDetailCard(key);
+        }
+
+        function onDistrictSelectChange(key) {
+            selectDistrict(key);
+            const item = districtData[key];
+            if (item) {
+                document.getElementById('district-map-search').value = item.name;
+                searchAndZoomDistrict();
+            }
+        }
+
+        function updateDistrictDetailCard(key) {
+            const item = districtData[key];
+            const card = document.getElementById('district-detail-card');
+            const profileTitle = currentLang === 'BM' ? 'Profil Daerah / Kawasan Kajian' : 'District / Study Area Profile';
+            const catLabel = currentLang === 'BM' ? 'Kategori Suhu Spasial:' : 'Spatial Temp Category:';
+            const avgTempLabel = currentLang === 'BM' ? 'Suhu Alam Sekitar Purata' : 'Average Environmental Temp';
+            const builtupLabel = currentLang === 'BM' ? 'Kawasan Tepubina' : 'Built-up Area';
+            const weatherLabel = currentLang === 'BM' ? 'Cuaca Semasa' : 'Current Weather';
+            const topoLabel = currentLang === 'BM' ? 'Topografi:' : 'Topography:';
+
+            card.innerHTML = `
+                <div class="space-y-2">
+                    <span class="text-[10px] font-black text-gov-blue uppercase tracking-wider">${profileTitle}</span>
+                    <h3 class="text-2xl font-black text-gov-blueDark tracking-tight">${item.name}</h3>
+                    <p class="text-xs text-black font-bold">${catLabel} <b class="text-rose-600">${item.category}</b></p>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-gov-border space-y-1 text-xs font-medium shadow-2xs">
+                    <span class="text-black font-bold block">${avgTempLabel}</span>
+                    <span class="text-2xl font-black text-amber-600">${item.temp} °C</span>
+                    <span class="text-[10px] text-black font-bold block"><i class="fa-solid fa-city text-gov-blue mr-1"></i> ${item.builtup} ${builtupLabel}</span>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-gov-border space-y-1 text-xs font-medium shadow-2xs">
+                    <span class="text-black font-bold block">${weatherLabel}</span>
+                    <span class="text-base font-black text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid ${item.weatherIcon} text-lg"></i> ${item.weather}
+                    </span>
+                    <span class="text-[10px] text-black font-bold block"><i class="fa-solid fa-circle-info text-sky-500 mr-1"></i> ${topoLabel} ${item.slope}</span>
+                </div>
+            `;
+        }
+
+        function initCharts() {
+            const ctxTrend = document.getElementById('trendChart').getContext('2d');
+            trendChart = new Chart(ctxTrend, {
+                type: 'line',
+                data: {
+                    labels: ['2006', '2011', '2016', '2020', '2025'],
+                    datasets: [{
+                        label: 'Suhu Purata Selangor (°C)',
+                        data: [27.2, 27.8, 28.1, 28.4, 28.7],
+                        borderColor: '#0284C7',
+                        backgroundColor: 'rgba(2, 132, 199, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            // Perbandingan Suhu Daerah (Suhu Min & Max Berkembar merentasi Daerah)
+            const ctxCompare = document.getElementById('compareChart').getContext('2d');
+            compareChart = new Chart(ctxCompare, {
+                type: 'bar',
+                data: {
+                    labels: ['Petaling', 'Shah Alam', 'Klang', 'Sepang', 'Gombak', 'H. Langat', 'K. Langat', 'H. Selangor'],
+                    datasets: [
+                        {
+                            label: 'Suhu Maksimum (°C)',
+                            data: [33.8, 33.2, 32.1, 30.5, 29.2, 28.5, 29.0, 26.5],
+                            backgroundColor: '#E11D48'
+                        },
+                        {
+                            label: 'Suhu Minimum (°C)',
+                            data: [25.5, 25.0, 24.8, 23.5, 22.8, 22.1, 23.0, 20.5],
+                            backgroundColor: '#0284C7'
+                        }
+                    ]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 10 } } } 
+                    } 
+                }
+            });
+
+            const ctxHotspot = document.getElementById('hotspotChart').getContext('2d');
+            hotspotChart = new Chart(ctxHotspot, {
+                type: 'bar',
+                data: {
+                    labels: ['Petaling Jaya', 'Shah Alam', 'Port Klang', 'Salak Tinggi', 'Rawang', 'Kajang', 'Banting'],
+                    datasets: [{
+                        label: 'Indeks Keamatan Hotspot (UHI)',
+                        data: [4.8, 4.5, 4.1, 3.7, 3.4, 3.2, 2.9],
+                        backgroundColor: ['#E11D48', '#EA580C', '#D97706', '#CA8A04', '#0284C7', '#10B981', '#6366F1']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }
+
+        window.onload = function() {
+            initCharts();
+            selectDistrict('petaling');
+        };
+
+        function handleSearch() {
+    const searchInput = document.getElementById('site-search');
+    if (!searchInput) return;
+    
+    const query = searchInput.value.trim().toLowerCase();
+    if (!query) {
+        alert('Sila masukkan nama daerah.');
+        return;
+    }
+
+    // Senarai koordinat asas daerah (Anda boleh tambah atau sesuaikan mengikut peta anda)
+    const districtCoordinates = {
+        'klang': { lat: 3.0449, lng: 101.4456, zoom: 12 },
+        'petaling': { lat: 3.1073, lng: 101.6067, zoom: 11 },
+        'gombak': { lat: 3.2379, lng: 101.6840, zoom: 11 },
+        'ulu langat': { lat: 2.9935, lng: 101.7865, zoom: 11 },
+        'sepang': { lat: 2.6901, lng: 101.7487, zoom: 11 },
+        'kuala langat': { lat: 2.8277, lng: 101.4912, zoom: 11 },
+        'kuala selangor': { lat: 3.3444, lng: 101.2568, zoom: 11 },
+        'sabak bernam': { lat: 3.7656, lng: 100.9850, zoom: 11 },
+        'hulu selangor': { lat: 3.5600, lng: 101.5500, zoom: 11 }
+    };
+
+    // Cari daerah yang sepadan dengan teks carian
+    let matchedKey = null;
+    for (let key in districtCoordinates) {
+        if (query.includes(key) || key.includes(query)) {
+            matchedKey = key;
+            break;
+        }
+    }
+
+    if (matchedKey) {
+        const coord = districtCoordinates[matchedKey];
+        
+        // 1. Jika anda guna Leaflet Map (pembolehubah peta biasanya dinamakan `map`)
+        if (typeof map !== 'undefined' && map.setView) {
+            map.setView([coord.lat, coord.lng], coord.zoom);
+        } 
+        // 2. Jika fungsi selectDistrict anda sudah wujud
+        else if (typeof selectDistrict === 'function') {
+            selectDistrict(matchedKey);
+        }
+
+        // Automatik skrol paparan ke bahagian peta
+        const mapSection = document.getElementById('peta-gis') || document.getElementById('map') || document.querySelector('.map-container');
+        if (mapSection) {
+            mapSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    } else {
+        alert('Daerah tidak dijumpai. Sila cuba nama daerah lain.');
+    }
+}
+    </script>
+</body>
+</html>
